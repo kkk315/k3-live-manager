@@ -1,27 +1,41 @@
-use super::repositories::SqliteCredentialRepository;
-use crate::services::credential_service::CredentialService;
+use super::repositories::SqliteRepository;
+use crate::services::{
+    credential_service::CredentialService,
+    oauth_service::OAuthService,
+};
 use sqlx::SqlitePool;
 use std::sync::Arc;
 use tauri::{AppHandle, Manager};
 
-// Initializes the database and sets up the service in the app state.
-pub async fn init(app_handle: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
-    // In development, the database file `app.sqlite` is in the root of the project (`k3-live-manager`),
-    // which is the parent directory of `src-tauri`.
-    let pool = SqlitePool::connect("sqlite:../app.sqlite").await?;
+// A single state struct to hold all services
+pub struct AppState {
+    pub credential_service: CredentialService,
+    pub oauth_service: OAuthService,
+}
 
-    // The `migrate!` macro looks for the migrations directory relative to `CARGO_MANIFEST_DIR`.
+// Initializes the database and sets up all services in the app state.
+pub async fn init(app_handle: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+    let pool = SqlitePool::connect("sqlite:../app.sqlite").await?;
     sqlx::migrate!("./migrations").run(&pool).await?;
 
-    let repo = Arc::new(SqliteCredentialRepository::new(pool));
-    let service = CredentialService::new(repo);
-    app_handle.manage(service);
+    // Create a single repository instance, wrapped in an Arc for shared ownership
+    let repo = Arc::new(SqliteRepository::new(pool));
+
+    // Create services, passing a clone of the repository Arc to each
+    let credential_service = CredentialService::new(repo.clone());
+    let oauth_service = OAuthService::new(repo.clone(), repo.clone());
+
+    // Create the final AppState and manage it
+    let app_state = AppState {
+        credential_service,
+        oauth_service,
+    };
+    app_handle.manage(app_state);
 
     Ok(())
 }
 
 // This function is only compiled for tests.
-// It sets up an in-memory SQLite database and runs migrations.
 #[cfg(test)]
 pub async fn init_test_db() -> anyhow::Result<SqlitePool> {
     let pool = SqlitePool::connect("sqlite::memory:").await?;

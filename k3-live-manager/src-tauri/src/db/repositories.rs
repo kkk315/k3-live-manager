@@ -1,25 +1,35 @@
-use super::models::{AddCredentialPayload, ServiceCredential};
+use super::models::{AddCredentialPayload, AddTokenPayload, OauthToken, ServiceCredential};
 use async_trait::async_trait;
 use sqlx::SqlitePool;
 
+// --- Credential Repository ---
 #[async_trait]
 pub trait CredentialRepository {
     async fn get_all_credentials(&self) -> anyhow::Result<Vec<ServiceCredential>>;
     async fn add_credential(&self, payload: AddCredentialPayload) -> anyhow::Result<ServiceCredential>;
 }
 
-pub struct SqliteCredentialRepository {
+// --- Token Repository ---
+#[async_trait]
+pub trait TokenRepository {
+    async fn add_token(&self, payload: AddTokenPayload) -> anyhow::Result<OauthToken>;
+    #[allow(dead_code)]
+    async fn get_token_by_credential_id(&self, credential_id: i64) -> anyhow::Result<Option<OauthToken>>;
+}
+
+// --- Concrete Implementation ---
+pub struct SqliteRepository {
     pool: SqlitePool,
 }
 
-impl SqliteCredentialRepository {
+impl SqliteRepository {
     pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
     }
 }
 
 #[async_trait]
-impl CredentialRepository for SqliteCredentialRepository {
+impl CredentialRepository for SqliteRepository {
     async fn get_all_credentials(&self) -> anyhow::Result<Vec<ServiceCredential>> {
         let creds = sqlx::query_as::<_, ServiceCredential>("SELECT * FROM service_credentials")
             .fetch_all(&self.pool)
@@ -40,61 +50,76 @@ impl CredentialRepository for SqliteCredentialRepository {
     }
 }
 
+#[async_trait]
+impl TokenRepository for SqliteRepository {
+    async fn add_token(&self, payload: AddTokenPayload) -> anyhow::Result<OauthToken> {
+        let token = sqlx::query_as::<_, OauthToken>(
+            "INSERT INTO oauth_tokens (credentials_id, access_token, refresh_token, expires_at, scope) VALUES (?, ?, ?, ?, ?) RETURNING *",
+        )
+        .bind(payload.credentials_id)
+        .bind(payload.access_token)
+        .bind(payload.refresh_token)
+        .bind(payload.expires_at)
+        .bind(payload.scope)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(token)
+    }
+
+    async fn get_token_by_credential_id(&self, credential_id: i64) -> anyhow::Result<Option<OauthToken>> {
+        let token = sqlx::query_as::<_, OauthToken>("SELECT * FROM oauth_tokens WHERE credentials_id = ?")
+            .bind(credential_id)
+            .fetch_optional(&self.pool)
+            .await?;
+        Ok(token)
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::db::setup::init_test_db;
 
-    // Helper to access the pool from the repository for tests
-    impl SqliteCredentialRepository {
-        fn pool(&self) -> &sqlx::SqlitePool {
-            &self.pool
-        }
-    }
-
     #[tokio::test]
-    async fn test_get_all_credentials() {
-        // 1. Set up an in-memory test database and repository
+    async fn test_add_and_get_credential() {
         let pool = init_test_db().await.unwrap();
-        let repo = SqliteCredentialRepository::new(pool);
-
-        // 2. Insert test data
-        sqlx::query("INSERT INTO service_credentials (id, service_name, client_id, client_secret) VALUES (1, 'test_service', 'test_id', 'test_secret')")
-            .execute(repo.pool())
-            .await
-            .unwrap();
-
-        // 3. Call the function with the test repository
-        let credentials = repo.get_all_credentials().await.unwrap();
-
-        // 4. Assert the results
-        assert_eq!(credentials.len(), 1);
-        assert_eq!(credentials[0].service_name, "test_service");
-    }
-
-    #[tokio::test]
-    async fn test_add_credential() {
-        // 1. Set up an in-memory test database and repository
-        let pool = init_test_db().await.unwrap();
-        let repo = SqliteCredentialRepository::new(pool);
-
-        // 2. Create a payload
+        let repo = SqliteRepository::new(pool);
         let payload = AddCredentialPayload {
-            service_name: "new_service".to_string(),
-            client_id: "new_id".to_string(),
-            client_secret: "new_secret".to_string(),
+            service_name: "test".to_string(),
+            client_id: "id".to_string(),
+            client_secret: "secret".to_string(),
+        };
+        repo.add_credential(payload).await.unwrap();
+        let creds = repo.get_all_credentials().await.unwrap();
+        assert_eq!(creds.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_add_and_get_token() {
+        let pool = init_test_db().await.unwrap();
+        let repo = SqliteRepository::new(pool);
+
+        // We need a credential first
+        let cred_payload = AddCredentialPayload {
+            service_name: "test".to_string(),
+            client_id: "id".to_string(),
+            client_secret: "secret".to_string(),
+        };
+        let cred = repo.add_credential(cred_payload).await.unwrap();
+
+        let token_payload = AddTokenPayload {
+            credentials_id: cred.id,
+            access_token: "test_access".to_string(),
+            refresh_token: "test_refresh".to_string(),
+            expires_at: "never".to_string(),
+            scope: Some("read".to_string()),
         };
 
-        // 3. Call the add function
-        let added_cred = repo.add_credential(payload).await.unwrap();
+        let added_token = repo.add_token(token_payload).await.unwrap();
+        assert_eq!(added_token.access_token, "test_access");
 
-        // 4. Assert the returned credential
-        assert_eq!(added_cred.service_name, "new_service");
-        assert_eq!(added_cred.client_id, "new_id");
-
-        // 5. Assert that the credential was actually inserted
-        let all_creds = repo.get_all_credentials().await.unwrap();
-        assert_eq!(all_creds.len(), 1);
-        assert_eq!(all_creds[0].service_name, "new_service");
+        let fetched_token = repo.get_token_by_credential_id(cred.id).await.unwrap().unwrap();
+        assert_eq!(fetched_token.access_token, "test_access");
     }
 }

@@ -1,13 +1,19 @@
-use super::models::ServiceCredential;
-use super::setup::AppState;
+use crate::db::models::{AddCredentialPayload, ServiceCredential};
+use crate::services::credential_service::CredentialService;
 use tauri::State;
 
 #[tauri::command]
 pub async fn get_service_credentials(
-    state: State<'_, AppState>,
+    state: State<'_, CredentialService>,
 ) -> Result<Vec<ServiceCredential>, String> {
-    let repo = &state.0;
-    repo.get_all_credentials()
-        .await
-        .map_err(|e| e.to_string())
+    state.get_all_credentials().await.map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub async fn add_service_credential(
+    payload: AddCredentialPayload,
+    state: State<'_, CredentialService>,
+) -> Result<ServiceCredential, String> {
+    state.add_credential(payload).await.map_err(|e| e.to_string())
+}
+

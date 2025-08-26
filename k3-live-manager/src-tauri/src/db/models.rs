@@ -31,7 +31,6 @@ pub struct OauthToken {
 
 // フロントエンドからデータを受け取るための構造体 (ペイロード)
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 pub struct AddCredentialPayload {
     pub service_name: String,
     pub client_id: String,

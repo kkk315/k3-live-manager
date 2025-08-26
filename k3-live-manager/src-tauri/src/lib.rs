@@ -23,7 +23,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             greet,
-            db::commands::get_service_credentials
+            db::commands::get_service_credentials,
+            db::commands::add_service_credential
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

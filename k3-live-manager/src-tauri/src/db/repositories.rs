@@ -12,8 +12,7 @@ pub trait CredentialRepository {
 // --- Token Repository ---
 #[async_trait]
 pub trait TokenRepository {
-    async fn add_token(&self, payload: AddTokenPayload) -> anyhow::Result<OauthToken>;
-    #[allow(dead_code)]
+    async fn upsert_token(&self, payload: AddTokenPayload) -> anyhow::Result<OauthToken>;
     async fn get_token_by_credential_id(&self, credential_id: i64) -> anyhow::Result<Option<OauthToken>>;
 }
 
@@ -52,9 +51,18 @@ impl CredentialRepository for SqliteRepository {
 
 #[async_trait]
 impl TokenRepository for SqliteRepository {
-    async fn add_token(&self, payload: AddTokenPayload) -> anyhow::Result<OauthToken> {
+    async fn upsert_token(&self, payload: AddTokenPayload) -> anyhow::Result<OauthToken> {
         let token = sqlx::query_as::<_, OauthToken>(
-            "INSERT INTO oauth_tokens (credentials_id, access_token, refresh_token, expires_at, scope) VALUES (?, ?, ?, ?, ?) RETURNING *",
+            r#"
+            INSERT INTO oauth_tokens (credentials_id, access_token, refresh_token, expires_at, scope) 
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(credentials_id) DO UPDATE SET
+                access_token = excluded.access_token,
+                refresh_token = excluded.refresh_token,
+                expires_at = excluded.expires_at,
+                scope = excluded.scope
+            RETURNING *
+            "#,
         )
         .bind(payload.credentials_id)
         .bind(payload.access_token)
@@ -96,7 +104,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_add_and_get_token() {
+    async fn test_upsert_token() {
         let pool = init_test_db().await.unwrap();
         let repo = SqliteRepository::new(pool);
 
@@ -108,18 +116,34 @@ mod tests {
         };
         let cred = repo.add_credential(cred_payload).await.unwrap();
 
-        let token_payload = AddTokenPayload {
+        // First upsert
+        let token_payload1 = AddTokenPayload {
             credentials_id: cred.id,
-            access_token: "test_access".to_string(),
-            refresh_token: "test_refresh".to_string(),
+            access_token: "test_access_1".to_string(),
+            refresh_token: "test_refresh_1".to_string(),
             expires_at: "never".to_string(),
             scope: Some("read".to_string()),
         };
 
-        let added_token = repo.add_token(token_payload).await.unwrap();
-        assert_eq!(added_token.access_token, "test_access");
+        let added_token1 = repo.upsert_token(token_payload1).await.unwrap();
+        assert_eq!(added_token1.access_token, "test_access_1");
 
+        // Second upsert with same credentials_id should update the token
+        let token_payload2 = AddTokenPayload {
+            credentials_id: cred.id,
+            access_token: "test_access_2".to_string(),
+            refresh_token: "test_refresh_2".to_string(),
+            expires_at: "never".to_string(),
+            scope: Some("write".to_string()),
+        };
+
+        let added_token2 = repo.upsert_token(token_payload2).await.unwrap();
+        assert_eq!(added_token2.access_token, "test_access_2");
+        assert_eq!(added_token2.scope, Some("write".to_string()));
+
+        // Should have only one token for this credential
         let fetched_token = repo.get_token_by_credential_id(cred.id).await.unwrap().unwrap();
-        assert_eq!(fetched_token.access_token, "test_access");
+        assert_eq!(fetched_token.access_token, "test_access_2");
+        assert_eq!(fetched_token.id, added_token1.id); // Same ID, updated content
     }
 }

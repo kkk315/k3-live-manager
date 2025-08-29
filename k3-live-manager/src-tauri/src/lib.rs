@@ -1,5 +1,6 @@
 mod db;
 mod services;
+mod oauth_server;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -14,7 +15,7 @@ pub fn run() {
         .plugin(tauri_plugin_sql::Builder::default().build())
         .setup(|app| {
             let handle = app.handle().clone();
-            tokio::spawn(async move {
+            tauri::async_runtime::spawn(async move {
                 db::setup::init(&handle)
                     .await
                     .expect("failed to initialize database");
@@ -25,8 +26,7 @@ pub fn run() {
             greet,
             db::commands::get_service_credentials,
             db::commands::add_service_credential,
-            db::commands::generate_google_auth_url,
-            db::commands::finalize_google_oauth
+            db::commands::start_oauth_flow
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

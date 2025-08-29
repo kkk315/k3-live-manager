@@ -19,7 +19,7 @@
 - 依存関係: `credential_service.get_all_credentials()`
 - セキュリティ: 秘密情報（client_secret）は返却仕様上含まれるのでUI側での表示/取り扱いに注意。
 
-## URL（フロント連携）
+## URL（フロントエンドの場合）
 
 - 呼び出し元: `src/pages/CredentialsListPage.tsx` 初期表示でinvoke。
 - 画面URL: `/credentials`
@@ -28,3 +28,5 @@
 
 - 正常系: 複数件/0件の取得。
 - 異常系: DB接続不可時にエラー文字列を返す。
+
+ 

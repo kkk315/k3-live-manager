@@ -29,3 +29,5 @@
 
 - 正常系: `/oauth/callback?code=...&state=...` で `(code,state)` が送出されHTMLが返る
 - 例外系: クエリ欠落/その他パスで404
+
+ 

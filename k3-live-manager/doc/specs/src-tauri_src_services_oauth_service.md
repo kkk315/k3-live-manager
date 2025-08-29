@@ -26,7 +26,7 @@
   - 出力: `()`（DBへUpsert済み）
   - エラー: トークン交換失敗/保存失敗 等
 
-### 新規追加 API（トークン有効性確認・リフレッシュ）
+ 
 
 - `ensure_valid_access_token(credential_id: i64, skew_secs: u64) -> anyhow::Result<(String, String)>`
   - 目的: 現在のアクセストークンの有効期限を確認し、期限切れ/猶予不足（`skew_secs`以内）ならリフレッシュする
@@ -55,7 +55,7 @@
 - 正常系: 有効な`credential_id`で認可URL/Stateが返る。コード交換成功でUpsertされる
 - 例外系: `credential_id`不正/クライアント作成失敗/交換失敗/DB保存失敗
 
-### リフレッシュ関連
+ 
 
 - 正常系: 期限切れ/猶予不足時に自動リフレッシュし、新しい`access_token`/`expires_at`が返る
 - 例外系: `refresh_token`欠如、`invalid_grant`、ネットワークタイムアウト
@@ -76,18 +76,5 @@ sequenceDiagram
   Svc-->>Cmd: ()
 ```
 
-```mermaid
-sequenceDiagram
-  participant API as Any API Caller (Command/Service)
-  participant Svc as OAuthService
-  participant RepoT as TokenRepo
-  API->>Svc: ensure_valid_access_token(credential_id, skew)
-  Svc->>RepoT: get_token_by_credential_id
-  RepoT-->>Svc: OauthToken
-  alt トークン期限切れ/猶予不足
-    Svc->>Svc: refresh_access_token(credential_id)
-    Svc->>RepoT: upsert_token(payload)
-    RepoT-->>Svc: OauthToken(updated)
-  end
-  Svc-->>API: (access_token, expires_at)
-```
+ 
+

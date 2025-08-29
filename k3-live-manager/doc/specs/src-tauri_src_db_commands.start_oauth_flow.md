@@ -12,6 +12,8 @@
 - 入力: `credential_id: i64`
 - 出力: `Ok(String)` 認可URL（外部ブラウザで開く用）
 - エラー: `Err(String)`（原因メッセージ）
+  
+補足: リダイレクトURLは固定 `http://localhost:1421/oauth/callback`
 
 ## 設計方針
 
@@ -19,7 +21,7 @@
 - 依存関係: `oauth_service.generate_auth_url`, `oauth_service.exchange_code_and_save_token`, `oauth_server::start_oauth_server`
 - セキュリティ: CSRF state検証、トークンはログに出さない、固定ポート1421、単一接続。
 
-## URL（フロント連携）
+## URL（フロントエンドの場合）
 
 - トリガーUI: `src/pages/CredentialsListPage.tsx` の「Authenticate」ボタン
 
@@ -32,13 +34,15 @@
 sequenceDiagram
   participant UI
   participant Cmd as start_oauth_flow
-  participant Svc as OauthService
+  participant Svc as OAuthService
   participant HTTP as OAuth Server(1421)
   UI->>Cmd: credential_id
   Cmd->>Svc: generate_auth_url(credential_id, redirect)
   Svc-->>Cmd: (auth_url, state)
-  Cmd-->>UI: auth_url
   Cmd->>HTTP: spawn server (oneshot)
+  Cmd-->>UI: auth_url
   HTTP-->>Cmd: (code, state)
   Cmd->>Svc: exchange_code_and_save_token(code, credential_id, redirect)
 ```
+
+ 

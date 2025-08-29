@@ -19,7 +19,7 @@
 - 依存関係: `credential_service.add_credential(payload)`
 - セキュリティ: client_secretの取り扱いに注意。ログ出力禁止。
 
-## URL（フロント連携）
+## URL（フロントエンドの場合）
 
 - 呼び出し元: `src/pages/AddCredentialPage.tsx` の保存
 - 画面URL: `/credentials/add`
@@ -28,3 +28,5 @@
 
 - 正常系: 正しいペイロードで追加され、戻り値が返る。
 - 異常系: 必須欠落時にエラー。
+
+ 

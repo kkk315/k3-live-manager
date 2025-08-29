@@ -1,3 +1,15 @@
+# Local SQLite database (do not commit secrets)
+app.sqlite
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+
+# Node & build artifacts
+node_modules/
+dist/
+
+# Rust target directory (Tauri build)
+src-tauri/target/
 # Logs
 logs
 *.log

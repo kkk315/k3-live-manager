@@ -14,7 +14,7 @@ impl CredentialService {
         Self { repo }
     }
 
-    //--- Pass-through methods ---
+    //--- Pass-through methods (business validations could be added here) ---
     pub async fn get_all_credentials(&self) -> anyhow::Result<Vec<ServiceCredential>> {
         self.repo.get_all_credentials().await
     }

@@ -41,28 +41,34 @@ impl OAuthService {
         Self { credential_repo, token_repo }
     }
 
-    pub async fn generate_auth_url(&self, credential_id: i64, redirect_url: &str) -> anyhow::Result<String> {
-        let all_creds = self.credential_repo.get_all_credentials().await?;
-        let credential = all_creds.iter().find(|c| c.id == credential_id).context("Credential not found")?;
+    pub async fn generate_auth_url(&self, credential_id: i64, redirect_url: &str) -> anyhow::Result<(String, String)> {
+        let credential = self
+            .credential_repo
+            .get_credential_by_id(credential_id)
+            .await?
+            .context("Credential not found")?;
 
-        let client = create_google_oauth_client(credential, redirect_url)?;
+    let client = create_google_oauth_client(&credential, redirect_url)?;
 
-        let (authorize_url, _csrf_token) = client
+    let (authorize_url, csrf_token) = client
             .authorize_url(oauth2::CsrfToken::new_random)
             .add_scope(oauth2::Scope::new("https://www.googleapis.com/auth/youtube".to_string()))
             .add_scope(oauth2::Scope::new("https://www.googleapis.com/auth/userinfo.profile".to_string()))
             .add_scope(oauth2::Scope::new("https://www.googleapis.com/auth/userinfo.email".to_string()))
             .url();
 
-        Ok(authorize_url.to_string())
+    Ok((authorize_url.to_string(), csrf_token.secret().to_string()))
     }
 
     pub async fn exchange_code_and_save_token(&self, code: String, credential_id: i64, redirect_url: &str) -> anyhow::Result<()> {
         println!("Starting token exchange for credential_id: {}", credential_id);
-        let all_creds = self.credential_repo.get_all_credentials().await?;
-        let credential = all_creds.iter().find(|c| c.id == credential_id).context("Credential not found")?;
+        let credential = self
+            .credential_repo
+            .get_credential_by_id(credential_id)
+            .await?
+            .context("Credential not found")?;
 
-        let client = create_google_oauth_client(credential, redirect_url)?;
+    let client = create_google_oauth_client(&credential, redirect_url)?;
 
         let token_result = client
             .exchange_code(oauth2::AuthorizationCode::new(code))
@@ -70,7 +76,7 @@ impl OAuthService {
             .await
             .context("Failed to exchange code for token")?;
 
-        println!("Token exchange successful. Access token: {}", token_result.access_token().secret());
+    println!("Token exchange successful.");
 
         let payload = AddTokenPayload {
             credentials_id: credential_id,

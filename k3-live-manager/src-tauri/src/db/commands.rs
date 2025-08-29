@@ -27,14 +27,17 @@ pub async fn start_oauth_flow(
     state: State<'_, AppState>,
 ) -> Result<String, String> {
     let (tx, rx) = oneshot::channel();
-    let port = 1421; // Or find an available port dynamically
+    let port = 1421; // fixed by design
     let redirect_url = format!("http://localhost:{}/oauth/callback", port);
 
-    // Generate the auth URL with the temporary server's redirect URL
-    let auth_url = state.oauth_service.generate_auth_url(credential_id, &redirect_url).await.map_err(|e| e.to_string())?;
+    // Generate the auth URL with state and the temporary server's redirect URL
+    let (auth_url, expected_state) = state
+        .oauth_service
+        .generate_auth_url(credential_id, &redirect_url)
+        .await
+        .map_err(|e| e.to_string())?;
 
     // Spawn the server in a background task
-    let oauth_service = state.oauth_service.clone();
     tauri::async_runtime::spawn(async move {
         // Start the OAuth server
         if let Err(e) = oauth_server::start_oauth_server(tx, port).await {
@@ -45,10 +48,15 @@ pub async fn start_oauth_flow(
 
     // Spawn another task to wait for the callback and process the token
     let oauth_service_clone = state.oauth_service.clone();
+    let expected_state_clone = expected_state.clone();
     tauri::async_runtime::spawn(async move {
         // Wait for the code and state from the server
         match rx.await {
-            Ok((code, _state)) => {
+            Ok((code, state_val)) => {
+                if state_val != expected_state_clone {
+                    eprintln!("State mismatch in OAuth callback. Potential CSRF.");
+                    return;
+                }
                 // Finalize OAuth with the received code
                 if let Err(e) = oauth_service_clone.exchange_code_and_save_token(code, credential_id, &redirect_url).await {
                     eprintln!("Failed to exchange OAuth code: {}", e);

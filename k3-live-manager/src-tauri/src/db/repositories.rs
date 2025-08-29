@@ -7,6 +7,7 @@ use sqlx::SqlitePool;
 pub trait CredentialRepository {
     async fn get_all_credentials(&self) -> anyhow::Result<Vec<ServiceCredential>>;
     async fn add_credential(&self, payload: AddCredentialPayload) -> anyhow::Result<ServiceCredential>;
+    async fn get_credential_by_id(&self, id: i64) -> anyhow::Result<Option<ServiceCredential>>;
 }
 
 // --- Token Repository ---
@@ -45,6 +46,14 @@ impl CredentialRepository for SqliteRepository {
         .bind(payload.client_secret)
         .fetch_one(&self.pool)
         .await?;
+        Ok(cred)
+    }
+
+    async fn get_credential_by_id(&self, id: i64) -> anyhow::Result<Option<ServiceCredential>> {
+        let cred = sqlx::query_as::<_, ServiceCredential>("SELECT * FROM service_credentials WHERE id = ?")
+            .bind(id)
+            .fetch_optional(&self.pool)
+            .await?;
         Ok(cred)
     }
 }

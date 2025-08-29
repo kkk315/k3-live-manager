@@ -20,9 +20,8 @@ pub async fn start_oauth_server(
 
     println!("OAuth server listening on {}", addr);
 
-    // We only expect one connection for the OAuth callback
+    // Single connection only
     let (stream, _remote_addr) = listener.accept().await?;
-
     let io = TokioIo::new(stream);
 
     use std::sync::{Arc, Mutex};
@@ -101,11 +100,26 @@ async fn handle_request(
                                 font-weight: bold;
                             }
                         </style>
+                        <script>
+                            let countdown = 5;
+                            function updateCountdown() {
+                                const el = document.getElementById('countdown');
+                                if (el) el.textContent = countdown;
+                                if (countdown <= 0) {
+                                    window.close();
+                                } else {
+                                    countdown--;
+                                    setTimeout(updateCountdown, 1000);
+                                }
+                            }
+                            window.onload = updateCountdown;
+                        </script>
                     </head>
                     <body>
                         <div class="container">
                             <h1>✅ 認証が完了しました</h1>
                             <p>認証が正常に完了しました。<br>アプリケーションに戻ってご利用ください。</p>
+                            <p class="countdown">このタブは <span id="countdown">5</span> 秒後に自動で閉じます</p>
                         </div>
                     </body>
                     </html>

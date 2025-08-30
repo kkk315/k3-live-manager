@@ -28,6 +28,7 @@
 備考:
 
 - `expires_at` は文字列（TIMESTAMP）で保存。リフレッシュ時に新しい値へ更新される
+- `refresh_token` はNOT NULL。未返却時は `no_refresh_token` を保存（後続でエラー扱い）
 
 ## 設計方針/セキュリティ
 

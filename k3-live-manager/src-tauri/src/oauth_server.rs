@@ -58,7 +58,7 @@ async fn handle_request(
             let state = url.query_pairs().find(|(key, _)| key == "state").map(|(_, value)| value.to_string());
 
             if let (Some(code), Some(state)) = (code, state) {
-                println!("Received OAuth callback. Code: {}, State: {}", code, state);
+                // Received OAuth callback (redacted)
                 if let Some(tx) = tx {
                     let _ = tx.send((code, state)); // Send the code and state back to the main app
                 }

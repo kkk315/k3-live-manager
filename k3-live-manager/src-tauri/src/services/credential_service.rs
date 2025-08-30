@@ -61,6 +61,10 @@ mod tests {
             // to test interactions between add and get.
             Ok(new_cred)
         }
+
+        async fn get_credential_by_id(&self, id: i64) -> anyhow::Result<Option<ServiceCredential>> {
+            Ok(self.credentials.iter().find(|c| c.id == id).cloned())
+        }
     }
 
     #[tokio::test]

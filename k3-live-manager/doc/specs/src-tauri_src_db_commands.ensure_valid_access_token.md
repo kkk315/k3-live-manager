@@ -1,6 +1,6 @@
-# 仕様書: Tauri コマンド `ensure_valid_access_token`（新規）
+# 仕様書: Tauri コマンド `ensure_valid_access_token`
 
-対象実装: `src-tauri/src/db/commands.rs` に追加予定の `ensure_valid_access_token`
+対象実装: `src-tauri/src/db/commands.rs` の `ensure_valid_access_token`
 
 ## 概要
 

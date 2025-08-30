@@ -3,6 +3,7 @@ use crate::db::setup::AppState;
 use tauri::State;
 use tokio::sync::oneshot;
 use crate::oauth_server;
+use serde::Serialize;
 
 // --- Credential Commands ---
 #[tauri::command]
@@ -70,4 +71,27 @@ pub async fn start_oauth_flow(
 
     // Return the auth URL immediately
     Ok(auth_url)
+}
+
+#[derive(Serialize)]
+pub struct AccessTokenInfo {
+    pub access_token: String,
+    pub expires_at: String,
+}
+
+/// Ensure a valid access token is available for the given credential.
+/// If the current token is expired or within skew seconds to expire, it will be refreshed.
+#[tauri::command]
+pub async fn ensure_valid_access_token(
+    credential_id: i64,
+    skew_secs: i64,
+    state: State<'_, AppState>,
+) -> Result<AccessTokenInfo, String> {
+    let skew = if skew_secs < 0 { 0 } else { skew_secs as u64 };
+    let (access_token, expires_at) = state
+        .oauth_service
+        .ensure_valid_access_token(credential_id, skew)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(AccessTokenInfo { access_token, expires_at })
 }
